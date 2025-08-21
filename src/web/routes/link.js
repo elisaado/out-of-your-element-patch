@@ -77,7 +77,7 @@ as.router.post("/api/link-space", defineEventHandler(async event => {
 
 	// Check space exists and bridge is joined
 	try {
-		await api.joinRoom(parsedBody.space_id)
+		await api.joinRoom(parsedBody.space_id, null, via)
 	} catch (e) {
 		throw createError({status: 403, message: e.errcode, data: `${e.errcode} - ${e.message}`})
 	}
@@ -135,19 +135,31 @@ as.router.post("/api/link", defineEventHandler(async event => {
 
 	// Check room is part of the guild's space
 	let found = false
+	let via = undefined
 	for await (const room of api.generateFullHierarchy(spaceID)) {
-		if (room.room_id === parsedBody.matrix && !room.room_type) {
+		if (via === undefined && room.room_type === "m.space") {
+			for (state of room.children_state) {
+				if (state.state_key === parsedBody.matrix){
+					via = {via: state.content.via}
+					if (found === true)
+						break
+				}
+			}
+		}
+
+		if (!found && room.room_id === parsedBody.matrix && !room.room_type) {
 			found = true
-			break
+			if (via !== undefined)
+				break
 		}
 	}
 	if (!found) throw createError({status: 400, message: "Bad Request", data: "Matrix room needs to be part of the bridged space"})
 
 	// Check room exists and bridge is joined
 	try {
-		await api.joinRoom(parsedBody.matrix)
+		await api.joinRoom(parsedBody.matrix, null, via ?? {})
 	} catch (e) {
-		throw createError({status: 403, message: e.errcode, data: `${e.errcode} - ${e.message}`})
+		throw createError({status: 403, message: e.errcode, data: `${e.errcode} - ${e.message}${via === null ? " (hint: couln't find a \"via\" in the space children_state for this room in order to help joining this room)" : ""}`})
 	}
 
 	// Check bridge has PL 100

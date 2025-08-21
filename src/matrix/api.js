@@ -64,9 +64,9 @@ async function createRoom(content) {
 /**
  * @returns {Promise<string>} room ID
  */
-async function joinRoom(roomIDOrAlias, mxid) {
+async function joinRoom(roomIDOrAlias, mxid, via) {
 	/** @type {Ty.R.RoomJoined} */
-	const root = await mreq.mreq("POST", path(`/client/v3/join/${roomIDOrAlias}`, mxid), {})
+	const root = await mreq.mreq("POST", path(`/client/v3/join/${roomIDOrAlias}`, mxid, via), {})
 	return root.room_id
 }
 
