@@ -13,6 +13,20 @@ const mreq = sync.require("../../matrix/mreq")
 const {reg} = require("../../matrix/read-registration")
 
 /**
+ * @param {string} UserID
+ * @returns {string} the HS of the user, or "" if the user ID is malformed
+ */
+function getHSOfUser(user) {
+	domainStartIndex = user.indexOf(":");
+	if (domainStartIndex >= 1) {
+		return user.slice(domainStartIndex + 1)
+	}
+
+	return ""
+}
+
+
+/**
  * @param {H3Event} event
  * @returns {import("../../matrix/api")}
  */
@@ -74,6 +88,9 @@ as.router.post("/api/link-space", defineEventHandler(async event => {
 	// Check they are not already bridged
 	const existing = select("guild_space", "guild_id", {}, "WHERE guild_id = ? OR space_id = ?").get(guildID, spaceID)
 	if (existing) throw createError({status: 400, message: "Bad Request", data: `Guild ID ${guildID} or space ID ${spaceID} are already bridged and cannot be reused`})
+
+	const inviteSender = select("invite", "mxid", {mxid: session.data.mxid, room_id: spaceID}).pluck().get()
+	via = [ getHSOfUser(inviteSender) ]
 
 	// Check space exists and bridge is joined
 	try {
