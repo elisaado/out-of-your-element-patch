@@ -134,32 +134,34 @@ as.router.post("/api/link", defineEventHandler(async event => {
 	if (row) throw createError({status: 400, message: "Bad Request", data: `Channel ID ${row.channel_id} or room ID ${parsedBody.matrix} are already bridged and cannot be reused`})
 
 	// Check room is part of the guild's space
-	let found = false
-	let via = undefined
+	let foundRoom = false
+	/** @type {string[]?} */
+	let foundVia = null
 	for await (const room of api.generateFullHierarchy(spaceID)) {
-		if (via === undefined && room.room_type === "m.space") {
-			for (state of room.children_state) {
-				if (state.state_key === parsedBody.matrix){
-					via = {via: state.content.via}
-					if (found === true)
-						break
-				}
+		// When finding a space during iteration, look at space's children state, because we need a `via` to join the room (when we find it later)
+		for (const state of room.children_state) {
+			if (state.type === "m.space.child" && state.state_key === parsedBody.matrix) {
+				foundVia = state.content.via
 			}
 		}
 
-		if (!found && room.room_id === parsedBody.matrix && !room.room_type) {
-			found = true
-			if (via !== undefined)
-				break
+		// When finding a room during iteration, see if it was the requested room (to confirm that the room is in the space)
+		if (room.room_id === parsedBody.matrix && !room.room_type) {
+			foundRoom = true
 		}
+
+		if (foundRoom && foundVia) break
 	}
-	if (!found) throw createError({status: 400, message: "Bad Request", data: "Matrix room needs to be part of the bridged space"})
+	if (!foundRoom) throw createError({status: 400, message: "Bad Request", data: "Matrix room needs to be part of the bridged space"})
 
 	// Check room exists and bridge is joined
 	try {
-		await api.joinRoom(parsedBody.matrix, null, via ?? {})
+		await api.joinRoom(parsedBody.matrix, null, foundVia)
 	} catch (e) {
-		throw createError({status: 403, message: e.errcode, data: `${e.errcode} - ${e.message}${via === null ? " (hint: couln't find a \"via\" in the space children_state for this room in order to help joining this room)" : ""}`})
+		if (!foundVia) {
+			throw createError({status: 403, message: "Unable To Join", data: `Unable to join the requested Matrix room. Please invite the bridge to the room and try again. (Server said: ${e.errcode} - ${e.message})`})
+		}
+		throw createError({status: 403, message: e.errcode, data: `${e.errcode} - ${e.message}`})
 	}
 
 	// Check bridge has PL 100
