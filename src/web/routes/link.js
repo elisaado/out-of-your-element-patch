@@ -96,6 +96,9 @@ as.router.post("/api/link-space", defineEventHandler(async event => {
 	try {
 		await api.joinRoom(parsedBody.space_id, null, via)
 	} catch (e) {
+		if (via.join("") == "") {
+			throw createError({status: 403, message: "Unable To Join", data: `Unable to join the requested Matrix space. Please invite the bridge to the space and try again. (Server said: ${e.errcode} - ${e.message})`})
+		}
 		throw createError({status: 403, message: e.errcode, data: `${e.errcode} - ${e.message}`})
 	}
 
