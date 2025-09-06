@@ -54,6 +54,10 @@ block body
   .s-page-title.mb24
     h1.s-page-title--header= guild.name
 
+    form(method="post" action=rel("/api/unlink-space") hx-confirm="Do you want to unlink this server?\nThis will unlink every channels listed below.\nIt may take a moment to clean up Matrix resources.")
+      input(type="hidden" name="guild_id" value=guild.id)
+      button.s-btn.s-btn__muted.s-btn__xs(hx-post=rel("/api/unlink-space") hx-trigger="click" hx-disabled-elt="this")!= icons.Icons.IconLinkSm
+
   .d-flex.g16(class="sm:fw-wrap")
     .fl-grow1
       h2.fs-headline1 Invite a Matrix user
