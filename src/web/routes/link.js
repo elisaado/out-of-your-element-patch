@@ -39,6 +39,33 @@ function getCreateSpace(event) {
 	return event.context.createSpace || sync.require("../../d2m/actions/create-space")
 }
 
+/**
+ * @param {H3Event} event
+ * @param {string} guild_id
+ */
+async function validateUserHaveRightsOnGuild(event, guild_id) {
+	const managed = await auth.getManagedGuilds(event)
+	if (!managed.has(guild_id))
+		throw createError({status: 403, message: "Forbidden", data: "Can't edit a guild you don't have Manage Server permissions in"})
+}
+
+/**
+ * @param {H3Event} event
+ * @param {string} guild_id
+ * @returns {Promise<DiscordTypes.APIGuild & {members: DiscordTypes.APIGuildMember[]}>}
+ */
+async function validateGuildAccess(event, guild_id) {
+	// Check guild ID or nonce
+	await validateUserHaveRightsOnGuild(event, guild_id)
+
+	// Check guild exists
+	const guild = discord.guilds.get(guild_id)
+	if (!guild)
+		throw createError({status: 400, message: "Bad Request", data: "Discord guild does not exist or bot has not joined it"})
+
+	return guild
+}
+
 const schema = {
 	linkSpace: z.object({
 		guild_id: z.string(),
@@ -58,12 +85,11 @@ const schema = {
 as.router.post("/api/link-space", defineEventHandler(async event => {
 	const parsedBody = await readValidatedBody(event, schema.linkSpace.parse)
 	const session = await auth.useSession(event)
-	const managed = await auth.getManagedGuilds(event)
 	const api = getAPI(event)
 
 	// Check guild ID
 	const guildID = parsedBody.guild_id
-	if (!managed.has(guildID)) throw createError({status: 403, message: "Forbidden", data: "Can't edit a guild you don't have Manage Server permissions in"})
+	await validateUserHaveRightsOnGuild(event, guildID)
 
 	// Check space ID
 	if (!session.data.mxid) throw createError({status: 403, message: "Forbidden", data: "Can't link with your Matrix space if you aren't logged in to Matrix"})
@@ -112,18 +138,12 @@ as.router.post("/api/link-space", defineEventHandler(async event => {
 
 as.router.post("/api/link", defineEventHandler(async event => {
 	const parsedBody = await readValidatedBody(event, schema.link.parse)
-	const managed = await auth.getManagedGuilds(event)
 	const api = getAPI(event)
 	const createRoom = getCreateRoom(event)
 	const createSpace = getCreateSpace(event)
 
-	// Check guild ID or nonce
 	const guildID = parsedBody.guild_id
-	if (!managed.has(guildID)) throw createError({status: 403, message: "Forbidden", data: "Can't edit a guild you don't have Manage Server permissions in"})
-
-	// Check guild is bridged
-	const guild = discord.guilds.get(guildID)
-	if (!guild) throw createError({status: 400, message: "Bad Request", data: "Discord guild does not exist or bot has not joined it"})
+	const guild = await validateGuildAccess(event, guildID)
 	const spaceID = await createSpace.ensureSpace(guild)
 
 	// Check channel exists
@@ -201,15 +221,9 @@ as.router.post("/api/link", defineEventHandler(async event => {
 
 as.router.post("/api/unlink", defineEventHandler(async event => {
 	const {channel_id, guild_id} = await readValidatedBody(event, schema.unlink.parse)
-	const managed = await auth.getManagedGuilds(event)
 	const createRoom = getCreateRoom(event)
 
-	// Check guild ID or nonce
-	if (!managed.has(guild_id)) throw createError({status: 403, message: "Forbidden", data: "Can't edit a guild you don't have Manage Server permissions in"})
-
-	// Check guild exists
-	const guild = discord.guilds.get(guild_id)
-	if (!guild) throw createError({status: 400, message: "Bad Request", data: "Discord guild does not exist or bot has not joined it"})
+	await validateGuildAccess(event, guild_id)
 
 	// Check that the channel (if it exists) is part of this guild
 	/** @type {any} */
