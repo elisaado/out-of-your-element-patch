@@ -12,6 +12,8 @@ const auth = sync.require("../auth")
 const mreq = sync.require("../../matrix/mreq")
 const {reg} = require("../../matrix/read-registration")
 
+const me = `@${reg.sender_localpart}:${reg.ooye.server_name}`
+
 /**
  * @param {H3Event} event
  * @returns {import("../../matrix/api")}
@@ -106,7 +108,10 @@ const schema = {
 	unlink: z.object({
 		guild_id: z.string(),
 		channel_id: z.string()
-	})
+	}),
+	unlinkSpace: z.object({
+		guild_id: z.string(),
+	}),
 }
 
 as.router.post("/api/link-space", defineEventHandler(async event => {
@@ -140,7 +145,6 @@ as.router.post("/api/link-space", defineEventHandler(async event => {
 	}
 
 	// Check bridge has PL 100
-	const me = `@${reg.sender_localpart}:${reg.ooye.server_name}`
 	/** @type {Ty.Event.M_Power_Levels?} */
 	let powerLevelsStateContent = null
 	try {
@@ -251,6 +255,41 @@ as.router.post("/api/unlink", defineEventHandler(async event => {
 	await validateGuildAccess(event, guild_id)
 
 	await doRoomUnlink(event, channel_id, guild_id)
+
+	setResponseHeader(event, "HX-Refresh", "true")
+	return null // 204
+}))
+
+as.router.post("/api/unlink-space", defineEventHandler(async event => {
+	const {guild_id} = await readValidatedBody(event, schema.unlinkSpace.parse)
+	const api = getAPI(event)
+	await validateGuildAccess(event, guild_id)
+
+	const spaceID = select("guild_space", "space_id", {guild_id: guild_id}).pluck().get()
+	if (!spaceID)
+		throw createError({status: 400, message: "Bad Request", data: "Matrix space does not exist or bot has not linked it"})
+
+	const linkedChannels = select("channel_room", ["channel_id", "room_id", "name", "nick"], {guild_id: guild_id}).all()
+
+	for (const channel of linkedChannels) {
+		await doRoomUnlink(event, channel.channel_id, guild_id)
+	}
+
+	const remainingLinkedChannels = select("channel_room", ["channel_id", "room_id", "name", "nick"], {guild_id: guild_id}).all()
+	if (remainingLinkedChannels.length !== 0)
+		throw createError({status: 500, message: "Internal Server Error", data: "Some linked room still exists after trying to unlink all of them. Aborting the space unlinking..."})
+
+	await api.setUserPower(spaceID, me, 0)
+	await api.leaveRoom(spaceID)
+
+	db.prepare("DELETE FROM guild_space WHERE guild_id=? AND space_id=?").run(guild_id, spaceID)
+
+	// NOTE: not deleting from guild_active as this can lead to inconsistent state:
+	// if we only delete from DB, the guild is still displayed on the top-right dropdown,
+	// but when selected we get the "Please add the bot to your server using the buttons on the home page." page
+	//
+	// So either keep as-is, or delete from guild_active, but also leave the discord guild? Not sure if we want that or not
+	// db.prepare("DELETE FROM guild_active WHERE guild_id=?").run(guild_id)
 
 	setResponseHeader(event, "HX-Refresh", "true")
 	return null // 204
