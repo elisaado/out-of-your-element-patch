@@ -66,6 +66,33 @@ async function validateGuildAccess(event, guild_id) {
 	return guild
 }
 
+/**
+ * @param {H3Event} event
+ * @param {string} channel_id
+ * @param {string} guild_id
+ */
+async function doRoomUnlink(event, channel_id, guild_id) {
+	const createRoom = getCreateRoom(event)
+
+	// Check that the channel (if it exists) is part of this guild
+	/** @type {any} */
+	let channel = discord.channels.get(channel_id)
+	if (channel) {
+		if (!("guild_id" in channel) || channel.guild_id !== guild_id) throw createError({status: 400, message: "Bad Request", data: `Channel ID ${channel_id} is not part of guild ${guild_id}`})
+	} else {
+		// Otherwise, if the channel isn't cached, it must have been deleted.
+		// There's no other authentication here - it's okay for anyone to unlink a deleted channel just by knowing its ID.
+		channel = {id: channel_id}
+	}
+
+	// Check channel is currently bridged
+	const row = select("channel_room", "channel_id", {channel_id: channel_id}).get()
+	if (!row) throw createError({status: 400, message: "Bad Request", data: `Channel ID ${channel_id} is not currently bridged`})
+
+	// Do it
+	await createRoom.unbridgeDeletedChannel(channel, guild_id)
+}
+
 const schema = {
 	linkSpace: z.object({
 		guild_id: z.string(),
@@ -221,27 +248,9 @@ as.router.post("/api/link", defineEventHandler(async event => {
 
 as.router.post("/api/unlink", defineEventHandler(async event => {
 	const {channel_id, guild_id} = await readValidatedBody(event, schema.unlink.parse)
-	const createRoom = getCreateRoom(event)
-
 	await validateGuildAccess(event, guild_id)
 
-	// Check that the channel (if it exists) is part of this guild
-	/** @type {any} */
-	let channel = discord.channels.get(channel_id)
-	if (channel) {
-		if (!("guild_id" in channel) || channel.guild_id !== guild_id) throw createError({status: 400, message: "Bad Request", data: `Channel ID ${channel_id} is not part of guild ${guild_id}`})
-	} else {
-		// Otherwise, if the channel isn't cached, it must have been deleted.
-		// There's no other authentication here - it's okay for anyone to unlink a deleted channel just by knowing its ID.
-		channel = {id: channel_id}
-	}
-
-	// Check channel is currently bridged
-	const row = select("channel_room", "channel_id", {channel_id: channel_id}).get()
-	if (!row) throw createError({status: 400, message: "Bad Request", data: `Channel ID ${channel_id} is not currently bridged`})
-
-	// Do it
-	await createRoom.unbridgeDeletedChannel(channel, guild_id)
+	await doRoomUnlink(event, channel_id, guild_id)
 
 	setResponseHeader(event, "HX-Refresh", "true")
 	return null // 204
