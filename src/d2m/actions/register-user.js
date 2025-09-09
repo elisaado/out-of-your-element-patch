@@ -165,7 +165,7 @@ function memberToPowerLevel(user, member, guild, channel) {
 	/* PL 50 = if room is read-only but the user has been specially allowed to send messages */
 	const everyoneCanSend = utils.hasPermission(everyonePermissions, DiscordTypes.PermissionFlagsBits.SendMessages)
 	const userCanSend = utils.hasPermission(permissions, DiscordTypes.PermissionFlagsBits.SendMessages)
-	if (!everyoneCanSend && userCanSend) return createRoom.READ_ONLY_ROOM_EVENTS_DEFAULT_POWER
+	if (!everyoneCanSend && userCanSend) return createRoom.getReadOnlyRoomEventsDefaultPower()
 	/* PL 20 = Mention Everyone for technical reasons. */
 	const everyoneCanMentionEveryone = utils.hasPermission(everyonePermissions, DiscordTypes.PermissionFlagsBits.MentionEveryone)
 	const userCanMentionEveryone = utils.hasPermission(permissions, DiscordTypes.PermissionFlagsBits.MentionEveryone)

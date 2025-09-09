@@ -31,6 +31,7 @@ export type AppServiceRegistrationConfig = {
 		discord_origin?: string
 		discord_cdn_origin?: string,
 		web_password: string
+		read_only_room_events_default_power?: number
 	}
 	old_bridge?: {
 		as_token: string
