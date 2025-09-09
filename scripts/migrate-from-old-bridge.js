@@ -16,7 +16,8 @@ const oldAT = reg.old_bridge.as_token
 const newAT = reg.as_token
 
 const oldDB = new sqlite(reg.old_bridge.database)
-const db = new sqlite("ooye.db")
+const {getDatabase} = require("../src/db/database")
+const db = getDatabase()
 
 db.exec(`CREATE TABLE IF NOT EXISTS half_shot_migration (
 	discord_channel	TEXT NOT NULL,

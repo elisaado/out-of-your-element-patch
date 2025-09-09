@@ -3,8 +3,8 @@
 const HeatSync = require("heatsync")
 const sync = new HeatSync({watchFS: false})
 
-const sqlite = require("better-sqlite3")
-const db = new sqlite("db/ooye.db")
+const {getDatabase} = require("../src/db/database")
+const db = getDatabase()
 
 const passthrough = require("../src/passthrough")
 Object.assign(passthrough, {db, sync})

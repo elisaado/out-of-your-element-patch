@@ -12,6 +12,7 @@ if (!channelID) {
 
 const assert = require("assert/strict")
 const sqlite = require("better-sqlite3")
+const path = require("path")
 const backfill = new sqlite("scripts/backfill.db")
 backfill.prepare("CREATE TABLE IF NOT EXISTS backfill (channel_id TEXT NOT NULL, message_id INTEGER NOT NULL, PRIMARY KEY (channel_id, message_id))").run()
 
@@ -19,9 +20,10 @@ const HeatSync = require("heatsync")
 
 const {reg} = require("../src/matrix/read-registration")
 const passthrough = require("../src/passthrough")
+const {getDatabase} = require("../src/db/database")
 
 const sync = new HeatSync({watchFS: false})
-const db = new sqlite("ooye.db")
+const db = getDatabase()
 Object.assign(passthrough, {sync, db})
 
 const DiscordClient = require("../src/d2m/discord-client")

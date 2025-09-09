@@ -34,7 +34,8 @@ if (fs.existsSync("db")) {
 }
 
 const passthrough = require("../src/passthrough")
-const db = new sqlite("ooye.db")
+const {getDatabase} = require("../src/db/database")
+const db = getDatabase()
 const migrate = require("../src/db/migrate")
 
 const sync = new HeatSync({watchFS: false})

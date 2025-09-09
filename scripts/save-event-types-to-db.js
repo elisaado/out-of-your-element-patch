@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // @ts-check
 
-const sqlite = require("better-sqlite3")
 const HeatSync = require("heatsync")
 
 const passthrough = require("../src/passthrough")
-const db = new sqlite("ooye.db")
+const {getDatabase} = require("../src/db/database")
+const db = getDatabase()
 
 const sync = new HeatSync({watchFS: false})
 
