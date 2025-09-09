@@ -58,7 +58,6 @@ function getTemplateRegistration(serverName) {
 			content_length_workaround: false,
 			include_user_id_in_mxid: false,
 			invite: [],
-			read_only_room_events_default_power: 50
 		}
 	}
 }
