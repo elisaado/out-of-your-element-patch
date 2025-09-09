@@ -5,7 +5,8 @@ const crypto = require("crypto")
 const assert = require("assert").strict
 const path = require("path")
 
-const registrationFilePath = path.join(process.cwd(), "registration.yaml")
+const dataDir = process.env.OOYE_DATA_DIR || process.cwd()
+const registrationFilePath = path.join(dataDir, "registration.yaml")
 
 /** @param {import("../types").AppServiceRegistrationConfig} reg */
 function checkRegistration(reg) {
@@ -57,7 +58,7 @@ function getTemplateRegistration(serverName) {
 			max_file_size: 5000000,
 			content_length_workaround: false,
 			include_user_id_in_mxid: false,
-			invite: [],
+			invite: []
 		}
 	}
 }
