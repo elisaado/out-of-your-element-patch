@@ -13,20 +13,6 @@ const mreq = sync.require("../../matrix/mreq")
 const {reg} = require("../../matrix/read-registration")
 
 /**
- * @param {string} UserID
- * @returns {string} the HS of the user, or "" if the user ID is malformed
- */
-function getHSOfUser(user) {
-	domainStartIndex = user.indexOf(":");
-	if (domainStartIndex >= 1) {
-		return user.slice(domainStartIndex + 1)
-	}
-
-	return ""
-}
-
-
-/**
  * @param {H3Event} event
  * @returns {import("../../matrix/api")}
  */
@@ -90,16 +76,13 @@ as.router.post("/api/link-space", defineEventHandler(async event => {
 	if (existing) throw createError({status: 400, message: "Bad Request", data: `Guild ID ${guildID} or space ID ${spaceID} are already bridged and cannot be reused`})
 
 	const inviteSender = select("invite", "mxid", {mxid: session.data.mxid, room_id: spaceID}).pluck().get()
-	via = [ getHSOfUser(inviteSender) ]
+    const via = [ inviteSender?.match(/:(.*)/)?.[1] ?? "" ]
 
 	// Check space exists and bridge is joined
 	try {
 		await api.joinRoom(parsedBody.space_id, null, via)
 	} catch (e) {
-		if (via.join("") == "") {
-			throw createError({status: 403, message: "Unable To Join", data: `Unable to join the requested Matrix space. Please invite the bridge to the space and try again. (Server said: ${e.errcode} - ${e.message})`})
-		}
-		throw createError({status: 403, message: e.errcode, data: `${e.errcode} - ${e.message}`})
+        throw createError({status: 400, message: "Unable To Join", data: `Unable to join the requested Matrix space. Please invite the bridge to the space and try again. (Server said: ${e.errcode} - ${e.message})`})
 	}
 
 	// Check bridge has PL 100
@@ -179,7 +162,7 @@ as.router.post("/api/link", defineEventHandler(async event => {
 		await api.joinRoom(parsedBody.matrix, null, foundVia)
 	} catch (e) {
 		if (!foundVia) {
-			throw createError({status: 403, message: "Unable To Join", data: `Unable to join the requested Matrix room. Please invite the bridge to the room and try again. (Server said: ${e.errcode} - ${e.message})`})
+			throw createError({status: 400, message: "Unable To Join", data: `Unable to join the requested Matrix room. Please invite the bridge to the room and try again. (Server said: ${e.errcode} - ${e.message})`})
 		}
 		throw createError({status: 403, message: e.errcode, data: `${e.errcode} - ${e.message}`})
 	}
