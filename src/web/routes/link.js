@@ -76,13 +76,13 @@ as.router.post("/api/link-space", defineEventHandler(async event => {
 	if (existing) throw createError({status: 400, message: "Bad Request", data: `Guild ID ${guildID} or space ID ${spaceID} are already bridged and cannot be reused`})
 
 	const inviteSender = select("invite", "mxid", {mxid: session.data.mxid, room_id: spaceID}).pluck().get()
-    const via = [ inviteSender?.match(/:(.*)/)?.[1] ?? "" ]
+	const via = [ inviteSender?.match(/:(.*)/)?.[1] ?? "" ]
 
 	// Check space exists and bridge is joined
 	try {
 		await api.joinRoom(parsedBody.space_id, null, via)
 	} catch (e) {
-        throw createError({status: 400, message: "Unable To Join", data: `Unable to join the requested Matrix space. Please invite the bridge to the space and try again. (Server said: ${e.errcode} - ${e.message})`})
+		throw createError({status: 400, message: "Unable To Join", data: `Unable to join the requested Matrix space. Please invite the bridge to the space and try again. (Server said: ${e.errcode} - ${e.message})`})
 	}
 
 	// Check bridge has PL 100

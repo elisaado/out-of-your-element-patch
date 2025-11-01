@@ -77,7 +77,7 @@ test("web link space: check that OOYE is joined", async t => {
 			}
 		}
 	}))
-	t.equal(error.data, "M_FORBIDDEN - not allowed to join I guess")
+	t.equal(error.data, "Unable to join the requested Matrix space. Please invite the bridge to the space and try again. (Server said: M_FORBIDDEN - not allowed to join I guess)")
 	t.equal(called, 1)
 })
 
