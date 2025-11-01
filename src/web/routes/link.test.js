@@ -666,7 +666,9 @@ test("web unlink room: successfully calls unbridgeDeletedChannel when the channe
 })
 
 test("web unlink room: checks that the channel is bridged", async t => {
+	const row = db.prepare("SELECT * FROM channel_room WHERE channel_id = '665310973967597573'").get()
 	db.prepare("DELETE FROM channel_room WHERE channel_id = '665310973967597573'").run()
+
 	const [error] = await tryToCatch(() => router.test("post", "/api/unlink", {
 		sessionData: {
 			managedGuilds: ["665289423482519565"]
@@ -677,4 +679,149 @@ test("web unlink room: checks that the channel is bridged", async t => {
 		}
 	}))
 	t.equal(error.data, "Channel ID 665310973967597573 is not currently bridged")
+
+	db.prepare("INSERT INTO channel_room (channel_id, room_id, name, nick, thread_parent, custom_avatar, last_bridged_pin_timestamp, speedbump_id, speedbump_checked, speedbump_webhook_id, guild_id, custom_topic) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(row.channel_id, row.room_id, row.name, row.nick, row.thread_parent, row.custom_avatar, row.last_bridged_pin_timestamp, row.speedbump_id, row.speedbump_checked, row.speedbump_webhook_id, row.guild_id, row.custom_topic)
+	const new_row = db.prepare("SELECT * FROM channel_room WHERE channel_id = '665310973967597573'").get()
+	t.deepEqual(row, new_row)
+})
+
+// *****
+
+test("web unlink space: access denied if not logged in to Discord", async t => {
+	const [error] = await tryToCatch(() => router.test("post", "/api/unlink-space", {
+		body: {
+			guild_id: "665289423482519565"
+		}
+	}))
+	t.equal(error.data, "Can't edit a guild you don't have Manage Server permissions in")
+})
+
+test("web unlink space: checks that guild exists", async t => {
+	const [error] = await tryToCatch(() => router.test("post", "/api/unlink-space", {
+		sessionData: {
+			managedGuilds: ["2"]
+		},
+		body: {
+			guild_id: "2"
+		}
+	}))
+	t.equal(error.data, "Discord guild does not exist or bot has not joined it")
+})
+
+test("web unlink space: checks that a space is linked to the guild before trying to unlink the space", async t => {
+	const row = db.prepare("SELECT * FROM guild_space WHERE guild_id = '665289423482519565'").get()
+	db.prepare("DELETE FROM guild_space WHERE guild_id = '665289423482519565'").run()
+
+	const [error] = await tryToCatch(() => router.test("post", "/api/unlink-space", {
+		sessionData: {
+			managedGuilds: ["665289423482519565"]
+		},
+		body: {
+			guild_id: "665289423482519565"
+		}
+	}))
+	t.equal(error.data, "Matrix space does not exist or bot has not linked it")
+
+	db.prepare("INSERT INTO guild_space (guild_id, space_id, privacy_level, presence, url_preview) VALUES (?, ?, ?, ?, ?)").run(row.guild_id, row.space_id, row.privacy_level, row.presence, row.url_preview)
+	const new_row = db.prepare("SELECT * FROM guild_space WHERE guild_id = '665289423482519565'").get()
+	t.deepEqual(row, new_row)
+})
+
+test("web unlink space: correctly abort unlinking if some linked channels remain after trying to unlink them all", async t => {
+	let unbridgedChannel = false
+
+	const [error] = await tryToCatch(() => router.test("post", "/api/unlink-space", {
+		sessionData: {
+			managedGuilds: ["665289423482519565"]
+		},
+		body: {
+			guild_id: "665289423482519565",
+		},
+		createRoom: {
+			async unbridgeDeletedChannel(channel, guildID) {
+				unbridgedChannel = true
+				t.equal(channel.id, "665310973967597573")
+				t.equal(guildID, "665289423482519565")
+				// Do not actually delete the link from DB, should trigger error later in check
+			}
+		},
+		api: {
+			async *generateFullHierarchy(spaceID) {
+				t.equal(spaceID, "!zTMspHVUBhFLLSdmnS:cadence.moe")
+				yield {
+					room_id: "!NDbIqNpJyPvfKRnNcr:cadence.moe",
+					children_state: {},
+					guest_can_join: false,
+					num_joined_members: 2
+				}
+				/* c8 ignore next */
+			},
+		}
+	}))
+
+	t.equal(error.data, "Some linked room still exists after trying to unlink all of them. Aborting the space unlinking...")
+	t.equal(unbridgedChannel, true)
+})
+
+test("web unlink space: successfully calls unbridgeDeletedChannel on linked channels in space, self-downgrade power level, leave space, and delete link from DB", async t => {
+	const {reg} = require("../../matrix/read-registration")
+	const me = `@${reg.sender_localpart}:${reg.ooye.server_name}`
+
+	const getLinkRowQuery = "SELECT * FROM guild_space WHERE guild_id = '665289423482519565'"
+
+	const row = db.prepare(getLinkRowQuery).get()
+	t.equal(row.space_id, "!zTMspHVUBhFLLSdmnS:cadence.moe")
+
+	let unbridgedChannel = false
+	let downgradedPowerLevel = false
+	let leftRoom = false
+	await router.test("post", "/api/unlink-space", {
+		sessionData: {
+			managedGuilds: ["665289423482519565"]
+		},
+		body: {
+			guild_id: "665289423482519565",
+		},
+		createRoom: {
+			async unbridgeDeletedChannel(channel, guildID) {
+				unbridgedChannel = true
+				t.equal(channel.id, "665310973967597573")
+				t.equal(guildID, "665289423482519565")
+
+				// In order to not simulate channel deletion and not trigger the post unlink channels, pre-unlink space check
+				db.prepare("DELETE FROM channel_room WHERE guild_id = '665289423482519565' AND channel_id = '665310973967597573'").run()
+			}
+		},
+		api: {
+			async *generateFullHierarchy(spaceID) {
+				t.equal(spaceID, "!zTMspHVUBhFLLSdmnS:cadence.moe")
+				yield {
+					room_id: "!NDbIqNpJyPvfKRnNcr:cadence.moe",
+					children_state: {},
+					guest_can_join: false,
+					num_joined_members: 2
+				}
+				/* c8 ignore next */
+			},
+
+			async setUserPower(spaceID, targetUser, powerLevel) {
+				downgradedPowerLevel = true
+				t.equal(spaceID, "!zTMspHVUBhFLLSdmnS:cadence.moe")
+				t.equal(targetUser, me)
+				t.equal(powerLevel, 0)
+			},
+
+			async leaveRoom(spaceID) {
+				leftRoom = true
+				t.equal(spaceID, "!zTMspHVUBhFLLSdmnS:cadence.moe")
+			},
+		}
+	})
+
+	t.equal(unbridgedChannel, true)
+	t.equal(downgradedPowerLevel, true)
+	t.equal(leftRoom, true)
+
+	const missed_row = db.prepare(getLinkRowQuery).get()
+	t.equal(missed_row, undefined)
 })
