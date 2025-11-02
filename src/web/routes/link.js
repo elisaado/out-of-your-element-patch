@@ -76,7 +76,8 @@ as.router.post("/api/link-space", defineEventHandler(async event => {
 	if (existing) throw createError({status: 400, message: "Bad Request", data: `Guild ID ${guildID} or space ID ${spaceID} are already bridged and cannot be reused`})
 
 	const inviteSender = select("invite", "mxid", {mxid: session.data.mxid, room_id: spaceID}).pluck().get()
-	const via = [ inviteSender?.match(/:(.*)/)?.[1] ?? "" ]
+	const inviteSenderServer = inviteSender?.match(/:(.*)/)?.[1]
+	const via = [inviteSenderServer || ""]
 
 	// Check space exists and bridge is joined
 	try {

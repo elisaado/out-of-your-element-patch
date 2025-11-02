@@ -149,7 +149,7 @@ export namespace Event {
 		prev_content?: any
 	}
 
-	export type Outer_StrippedChildStateEvent = {
+	export type StrippedChildStateEvent = {
 		type: string
 		state_key: string
 		sender: string
@@ -353,7 +353,7 @@ export namespace R {
 	export type Hierarchy = {
 		avatar_url?: string
 		canonical_alias?: string
-		children_state: Event.Outer_StrippedChildStateEvent[]
+		children_state: Event.StrippedChildStateEvent[]
 		guest_can_join: boolean
 		join_rule?: string
 		name?: string
