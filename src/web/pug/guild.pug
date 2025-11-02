@@ -54,10 +54,6 @@ block body
   .s-page-title.mb24
     h1.s-page-title--header= guild.name
 
-    form(method="post" action=rel("/api/unlink-space") hx-confirm="Do you want to unlink this server?\nThis will unlink every channels listed below.\nIt may take a moment to clean up Matrix resources.")
-      input(type="hidden" name="guild_id" value=guild.id)
-      button.s-btn.s-btn__muted.s-btn__xs(hx-post=rel("/api/unlink-space") hx-trigger="click" hx-disabled-elt="this")!= icons.Icons.IconLinkSm
-
   .d-flex.g16(class="sm:fw-wrap")
     .fl-grow1
       h2.fs-headline1 Invite a Matrix user
@@ -133,13 +129,13 @@ block body
 
     h3.mt32.fs-category Linked channels
     .s-card.bs-sm.p0
-      form.s-table-container(method="post" action=rel("/api/unlink") hx-confirm="Do you want to unlink these channels?\nIt may take a moment to clean up Matrix resources.")
+      form.s-table-container(method="post" action=rel("/api/unlink"))
         input(type="hidden" name="guild_id" value=guild_id)
         table.s-table.s-table__bx-simple
           each row in linkedChannelsWithDetails
             tr
               td.w40: +discord(row.channel)
-              td.p2: button.s-btn.s-btn__muted.s-btn__xs(name="channel_id" value=row.channel.id hx-post=rel("/api/unlink") hx-trigger="click" hx-disabled-elt="this")!= icons.Icons.IconLinkSm
+              td.p2: button.s-btn.s-btn__muted.s-btn__xs(name="channel_id" cx-prevent-default hx-post=rel("/api/unlink") hx-confirm="Do you want to unlink these channels?\nIt may take a moment to clean up Matrix resources." value=row.channel.id hx-indicator="this" hx-disabled-elt="this")!= icons.Icons.IconLinkSm
               td: +matrix(row)
           else
             tr
@@ -180,6 +176,18 @@ block body
           != icons.Icons.IconMerge
           = ` Link`
 
+    h3.mt32.fs-category Unlink server
+    form.s-card.d-flex.fd-row-reverse.gx24.pl24.ai-center(method="post" action=rel("/api/unlink-space"))
+      input(type="hidden" name="guild_id" value=guild.id)
+      .fl-grow1.s-prose.s-prose__sm.lh-xl
+        p.
+          Sick of this bridge, or just made a mistake? You can unlink the whole server and all its channels.#[br]
+          This may take a minute to process. Please be patient and wait until the page refreshes.
+      div
+        button.s-btn.s-btn__icon.s-btn__danger.s-btn__outlined(cx-prevent-default hx-post=rel("/api/unlink-space") hx-confirm="Do you want to unlink this server and all its channels?\nIt may take a minute to clean up Matrix resources." hx-indicator="this" hx-disabled-elt="this")
+          != icons.Icons.IconUnsync
+          span.ml4= ` Unlink`
+
     details.mt48
       summary Debug room list
       .d-grid.grid__2.gx24
@@ -200,7 +208,7 @@ block body
             ul.my8.ml24
               each row in removedWrongTypeChannels
                 li: a(href=`https://discord.com/channels/${guild_id}/${row.id}`) (#{row.type}) #{row.name}
-          h3.mt24 Unavailable channels: Bridge can't access
+          h3.mt24 Unavailable channels: Discord bot can't access
           .s-card.p0
             ul.my8.ml24
               each row in removedPrivateChannels

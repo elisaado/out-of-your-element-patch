@@ -750,7 +750,7 @@ test("web unlink space: correctly abort unlinking if some linked channels remain
 				t.equal(spaceID, "!zTMspHVUBhFLLSdmnS:cadence.moe")
 				yield {
 					room_id: "!NDbIqNpJyPvfKRnNcr:cadence.moe",
-					children_state: {},
+					children_state: [],
 					guest_can_join: false,
 					num_joined_members: 2
 				}
@@ -797,7 +797,7 @@ test("web unlink space: successfully calls unbridgeDeletedChannel on linked chan
 				t.equal(spaceID, "!zTMspHVUBhFLLSdmnS:cadence.moe")
 				yield {
 					room_id: "!NDbIqNpJyPvfKRnNcr:cadence.moe",
-					children_state: {},
+					children_state: [],
 					guest_can_join: false,
 					num_joined_members: 2
 				}
