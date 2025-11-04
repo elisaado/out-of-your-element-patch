@@ -507,6 +507,7 @@ async function unbridgeDeletedChannel(channel, guildID) {
 	}
 
 	// leave room
+	await api.setUserPower(roomID, bot, 0)
 	await api.leaveRoom(roomID)
 }
 
