@@ -459,12 +459,12 @@ async function unbridgeDeletedChannel(channel, guildID) {
 	const webhook = select("webhook", ["webhook_id", "webhook_token"], {channel_id: channel.id}).get()
 	if (webhook) {
 		await discord.snow.webhook.deleteWebhook(webhook.webhook_id, webhook.webhook_token)
-		db.prepare("DELETE FROM webhook WHERE channel_id = ?").run(channel.id)
+		await db.prepare("DELETE FROM webhook WHERE channel_id = ?").run(channel.id)
 	}
 
 	// delete room from database
-	db.prepare("DELETE FROM member_cache WHERE room_id = ?").run(roomID)
-	db.prepare("DELETE FROM channel_room WHERE room_id = ? AND channel_id = ?").run(roomID, channel.id) // cascades to most other tables, like messages
+	await db.prepare("DELETE FROM member_cache WHERE room_id = ?").run(roomID)
+	await db.prepare("DELETE FROM channel_room WHERE room_id = ? AND channel_id = ?").run(roomID, channel.id) // cascades to most other tables, like messages
 
 	if (!botInRoom) return
 
