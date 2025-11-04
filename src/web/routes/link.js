@@ -266,31 +266,38 @@ as.router.post("/api/unlink-space", defineEventHandler(async event => {
 	await validateGuildAccess(event, guild_id)
 
 	const spaceID = select("guild_space", "space_id", {guild_id: guild_id}).pluck().get()
-	if (!spaceID)
+	if (!spaceID) {
 		throw createError({status: 400, message: "Bad Request", data: "Matrix space does not exist or bot has not linked it"})
+	}
 
 	const linkedChannels = select("channel_room", ["channel_id", "room_id", "name", "nick"], {guild_id: guild_id}).all()
 
 	for (const channel of linkedChannels) {
 		await doRoomUnlink(event, channel.channel_id, guild_id)
+
+		// FIXME: probably fix the underlying issue instead:
+		// If not waiting for ~1s, then the room is half unbridged:
+		// the resources in the room is not properly cleaned up, meaning that the sim users
+		// and the bridge user are not power demoted nor leave the room
+		// The entry from the channel_room table is not deleted
+		// After that, writing in the discord channel does nothing,
+		// and writing in the matrix channel spawns an error for not finding guild_id
+		await new Promise(r => setTimeout(r, 5000));
 	}
 
 	const remainingLinkedChannels = select("channel_room", ["channel_id", "room_id", "name", "nick"], {guild_id: guild_id}).all()
-	if (remainingLinkedChannels.length !== 0)
+	if (remainingLinkedChannels.length !== 0) {
 		throw createError({status: 500, message: "Internal Server Error", data: "Some linked room still exists after trying to unlink all of them. Aborting the space unlinking..."})
+	}
 
 	await api.setUserPower(spaceID, me, 0)
 	await api.leaveRoom(spaceID)
 
 	db.prepare("DELETE FROM guild_space WHERE guild_id=? AND space_id=?").run(guild_id, spaceID)
+	db.prepare("DELETE FROM guild_active WHERE guild_id=?").run(guild_id)
+	await discord.snow.user.leaveGuild(guild_id)
+	db.prepare("DELETE FROM invite WHERE room_id=?").run(spaceID)
 
-	// NOTE: not deleting from guild_active as this can lead to inconsistent state:
-	// if we only delete from DB, the guild is still displayed on the top-right dropdown,
-	// but when selected we get the "Please add the bot to your server using the buttons on the home page." page
-	//
-	// So either keep as-is, or delete from guild_active, but also leave the discord guild? Not sure if we want that or not
-	// db.prepare("DELETE FROM guild_active WHERE guild_id=?").run(guild_id)
-
-	setResponseHeader(event, "HX-Refresh", "true")
-	return null // 204
+	setResponseHeader(event, "HX-Redirect", "/")
+	return null
 }))
