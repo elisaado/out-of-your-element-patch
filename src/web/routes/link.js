@@ -43,6 +43,15 @@ function getCreateSpace(event) {
 
 /**
  * @param {H3Event} event
+ * @returns {import("snowtransfer").SnowTransfer}
+ */
+function getSnow(event) {
+	/* c8 ignore next */
+	return event.context.snow || discord.snow
+}
+
+/**
+ * @param {H3Event} event
  * @param {string} channel_id
  * @param {string} guild_id
  */
@@ -251,6 +260,7 @@ as.router.post("/api/unlink-space", defineEventHandler(async event => {
 	const {guild_id} = await readValidatedBody(event, schema.unlinkSpace.parse)
 	const managed = await auth.getManagedGuilds(event)
 	const api = getAPI(event)
+	const snow = getSnow(event)
 
 	// Check guild ID or nonce
 	if (!managed.has(guild_id)) throw createError({status: 403, message: "Forbidden", data: "Can't edit a guild you don't have Manage Server permissions in"})
@@ -280,7 +290,7 @@ as.router.post("/api/unlink-space", defineEventHandler(async event => {
 
 	await db.prepare("DELETE FROM guild_space WHERE guild_id=? AND space_id=?").run(guild_id, spaceID)
 	await db.prepare("DELETE FROM guild_active WHERE guild_id=?").run(guild_id)
-	await discord.snow.user.leaveGuild(guild_id)
+	await snow.user.leaveGuild(guild_id)
 	await db.prepare("DELETE FROM invite WHERE room_id=?").run(spaceID)
 
 	setResponseHeader(event, "HX-Redirect", "/")
