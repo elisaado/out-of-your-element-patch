@@ -278,6 +278,15 @@ as.router.post("/api/unlink-space", defineEventHandler(async event => {
 
 	for (const channel of linkedChannels) {
 		await doRoomUnlink(event, channel.channel_id, guild_id)
+
+		// FIXME: probably fix the underlying issue instead:
+		// If not waiting for ~1s, then the room is half unbridged:
+		// the resources in the room is not properly cleaned up, meaning that the sim users
+		// and the bridge user are not power demoted nor leave the room
+		// The entry from the channel_room table is not deleted
+		// After that, writing in the discord channel does nothing,
+		// and writing in the matrix channel spawns an error for not finding guild_id
+		await new Promise(r => setTimeout(r, 5000));
 	}
 
 	const remainingLinkedChannels = select("channel_room", ["channel_id", "room_id", "name", "nick"], {guild_id: guild_id}).all()
@@ -288,10 +297,10 @@ as.router.post("/api/unlink-space", defineEventHandler(async event => {
 	await api.setUserPower(spaceID, me, 0)
 	await api.leaveRoom(spaceID)
 
-	await db.prepare("DELETE FROM guild_space WHERE guild_id=? AND space_id=?").run(guild_id, spaceID)
-	await db.prepare("DELETE FROM guild_active WHERE guild_id=?").run(guild_id)
+	db.prepare("DELETE FROM guild_space WHERE guild_id=? AND space_id=?").run(guild_id, spaceID)
+	db.prepare("DELETE FROM guild_active WHERE guild_id=?").run(guild_id)
 	await snow.user.leaveGuild(guild_id)
-	await db.prepare("DELETE FROM invite WHERE room_id=?").run(spaceID)
+	db.prepare("DELETE FROM invite WHERE room_id=?").run(spaceID)
 
 	setResponseHeader(event, "HX-Redirect", "/")
 	return null
