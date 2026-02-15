@@ -18,7 +18,8 @@ const inflight = new Map()
  * @param {string} url
  */
 function _removeExpiryParams(url) {
-	return url.replace(/\?(?:(?:ex|is|sg|hm)=[a-f0-9]+&?)*$/, "")
+	return url;
+	//return url.replace(/\?(?:(?:ex|is|sg|hm)=[a-f0-9]+&?)*$/, "")
 }
 
 /**
